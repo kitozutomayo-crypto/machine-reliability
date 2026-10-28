@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy.integrate import quad
+from scipy.optimize import minimize_scalar
 
 from weibull import weibull_reliability
 
@@ -41,6 +42,27 @@ def cost_rate(T, beta, eta, preventive_cost, failure_cost):
     return expected_cost / cycle_length
 
 
+def optimize_maintenance(
+    beta,
+    eta,
+    preventive_cost,
+    failure_cost
+):
+    result = minimize_scalar(
+        lambda T: cost_rate(
+            T,
+            beta,
+            eta,
+            preventive_cost,
+            failure_cost
+        ),
+        bounds=(20, 800),
+        method="bounded"
+    )
+
+    return result.x, result.fun
+
+
 if __name__ == "__main__":
 
     beta = 1.9267
@@ -49,75 +71,67 @@ if __name__ == "__main__":
     preventive_cost = 100
     failure_cost = 1000
 
-    maintenance_times = np.linspace(20, 800, 300)
-
-    cost_rates = np.array([
-        cost_rate(
-            T,
-            beta,
-            eta,
-            preventive_cost,
-            failure_cost
-        )
-        for T in maintenance_times
-    ])
-
-    optimal_index = np.argmin(cost_rates)
-
-    optimal_time = maintenance_times[optimal_index]
-    optimal_cost_rate = cost_rates[optimal_index]
+    optimal_time, optimal_cost_rate = optimize_maintenance(
+        beta,
+        eta,
+        preventive_cost,
+        failure_cost
+    )
 
     print(f"Optimal maintenance time: {optimal_time:.2f} hours")
     print(
         f"Minimum expected cost rate: "
         f"{optimal_cost_rate:.4f} per hour"
     )
-# Sensitivity analysis
 
-failure_costs = [300, 500, 1000, 2000]
+    # Sensitivity analysis
 
-print("\nSensitivity Analysis")
+    failure_costs = [300, 500, 1000, 2000]
+    maintenance_times = np.linspace(20, 800, 300)
 
-for failure_cost in failure_costs:
+    print("\nSensitivity Analysis")
 
-    cost_rates = np.array([
-        cost_rate(
-            T,
+    for failure_cost in failure_costs:
+
+        optimal_time, optimal_cost_rate = optimize_maintenance(
             beta,
             eta,
             preventive_cost,
             failure_cost
         )
-        for T in maintenance_times
-    ])
 
-    optimal_index = np.argmin(cost_rates)
+        print(
+            f"Failure cost = {failure_cost:4d} | "
+            f"Optimal T = {optimal_time:7.2f} h | "
+            f"Cost rate = {optimal_cost_rate:.4f}"
+        )
 
-    optimal_time = maintenance_times[optimal_index]
-    optimal_cost_rate = cost_rates[optimal_index]
+        cost_rates = np.array([
+            cost_rate(
+                T,
+                beta,
+                eta,
+                preventive_cost,
+                failure_cost
+            )
+            for T in maintenance_times
+        ])
 
-    print(
-        f"Failure cost = {failure_cost:4d} | "
-        f"Optimal T = {optimal_time:7.2f} h | "
-        f"Cost rate = {optimal_cost_rate:.4f}"
-    )
-    plt.plot(
-        maintenance_times,
-        cost_rates,
-        label="Expected cost rate"
-    )
-
-    plt.axvline(
-        optimal_time,
-        linestyle="--",
-        label=f"Optimal T = {optimal_time:.1f} h"
-    )
+        plt.plot(
+            maintenance_times,
+            cost_rates,
+            label=f"Failure cost = {failure_cost}"
+        )
 
     plt.xlabel("Preventive Maintenance Time (hours)")
     plt.ylabel("Expected Cost per Hour")
     plt.title("Maintenance Cost Optimization")
 
-    plt.legend()
-    plt.grid(True)
+    plt.savefig(
+    "figures/maintenance_cost_optimization.png",
+    dpi=300,
+    bbox_inches="tight"
+)
+plt.show()
 
-    plt.show()
+
